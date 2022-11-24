@@ -32,6 +32,8 @@
       </list>
     </property>
 
+    <property name="defaultSerializationFormat" value="JSON" />
+
   </bean>
 
   <!--<bean id="uuidGenerator" class="org.camunda.bpm.engine.impl.persistence.StrongUuidGenerator" />-->
