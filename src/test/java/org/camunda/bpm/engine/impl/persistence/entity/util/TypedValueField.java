@@ -158,12 +158,10 @@
 //		if (cachedValue != null && isMutableValue(cachedValue)) {
 //
 //			// potential_fix_begin
-//            if(valueFields instanceof VariableInstanceEntity) {
-//	            TypedValue typedValue = ((VariableInstanceEntity) valueFields).getTypedValue(false);
-//				if(!(typedValue instanceof SerializableValue) || ((SerializableValue) typedValue).isDeserialized()) {
-//	                return !Objects.equals(cachedValue.getValue(), typedValue.getValue());
-//				}
-//            }
+//			if(cachedValue != null && (!(cachedValue instanceof SerializableValue) || ((SerializableValue) cachedValue).isDeserialized())) {
+//				TypedValue original = getSerializer().readValue(valueFields, true, cachedValue.isTransient());
+//				return !Objects.equals(cachedValue.getValue(), original.getValue());
+//			}
 //			// potential_fix_end
 //
 //			byte[] byteArray = valueFields.getByteArrayValue();
