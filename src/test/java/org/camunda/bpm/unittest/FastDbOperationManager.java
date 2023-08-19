@@ -16,6 +16,30 @@ public class FastDbOperationManager extends DbOperationManager
 
 	private static final Function<String, Set<String>> SET_FACTORY = k -> new HashSet<>();
 
+	/**
+	 * Sort the incoming set of DbEntityOperations using topological sort.
+	 * <p>
+	 * The idea is to first scan all the operations and prepare a map of
+	 * dependents and also find the number of pre-requisites for each operation.
+	 * <p>
+	 * dependents map will hold information about the entity ids that are dependent on each entity
+	 * i.e the keys are entityIds and the values are the set of entityIds to be executed after the key entityId.
+	 * <p>
+	 * prerequisitesCount map will hold information about the number of operations that need to be executed before
+	 * the current one can be executed. An entity-operation with a prerequisites count of zero means it does not have
+	 * any dependencies and can be executed immediately.
+	 * <p>
+	 * Once the dependents and prerequisitesCount have been computed, in the next step, we start with
+	 * operations with no prerequisites (i.e, prerequisitesCount = 0) and execute all of them. After
+	 * executing each, we find all the operations that depend on the current one and reduce their
+	 * prerequisitesCount by one. By doing this, we whittle away at the pre-requisites of future
+	 * operations till they themselves become eligible for execution when the count reaches 0.
+	 * <p>
+	 * When this happens for an entity-operation (i.e, prerequisitesCount reaches 0), it's queued up
+	 * for the next round of processing. This is done till the processing queue (the variable 'toVisit') is empty.
+	 * When the processing queue is empty, the resultant list of operations is properly sorted with
+	 * dependencies being respected.
+	 */
 	@Override
 	protected List<DbEntityOperation> sortByReferences(SortedSet<DbEntityOperation> preSorted)
 	{
@@ -32,6 +56,7 @@ public class FastDbOperationManager extends DbOperationManager
 		Map<String, Set<String>> dependents = new HashMap<>();
 		Map<String, Integer> prerequisitesCount = new HashMap<>();
 
+		// scan all operations and prepare dependents and prerequisite counts
 		for (DbEntityOperation operation : preSorted)
 		{
 			String current = operation.getEntity().getId();
@@ -84,6 +109,8 @@ public class FastDbOperationManager extends DbOperationManager
 
 		Queue<String> toVisit = new LinkedList<>();
 
+		// populate queue with operations eligible for first round of processing
+		// i.e, operations with no pre-requisites
 		for (Map.Entry<String, Integer> entry : prerequisitesCount.entrySet())
 		{
 			if (entry.getValue() == 0)
@@ -92,6 +119,7 @@ public class FastDbOperationManager extends DbOperationManager
 			}
 		}
 
+		// process queue till it's empty
 		while (!toVisit.isEmpty())
 		{
 			Queue<String> curLevel = new LinkedList<>(toVisit);
@@ -101,8 +129,10 @@ public class FastDbOperationManager extends DbOperationManager
 				String cur = curLevel.poll();
 				if (all.containsKey(cur))
 				{
-					opList.add(all.remove(cur));
+					opList.add(all.remove(cur)); // add the current operation to final list
 				}
+				// find dependents of current operation and reduce their pre-requisite count by one.
+				// if any dependent ends up with pre-requisite count = 0, queue it up for processing in next round.
 				for (String dependent : dependents.getOrDefault(cur, new HashSet<>()))
 				{
 					if (prerequisitesCount.containsKey(dependent))
